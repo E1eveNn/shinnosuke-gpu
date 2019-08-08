@@ -78,10 +78,29 @@ model.fit(trainX,trainy,batch_size=512,epochs=1,validation_ratio=0.)
 - ZeroPadding2D
 - Operations( includes Add, Minus, Multiply, Matmul, and so on basic operations for Layer and Node)
 
+Layer Operations are conducted to construt the graph.
+for examples:
+
+
 #### - Node:
 
 - Variable
 - Constant
+
+While Node Operations have both dynamic graph and static graph features
+```python
+x=Variable(3)
+y=Variable(5)
+z=x+y
+print(z.get_value())
+```
+#you suppose get 8,at same time shinnosuke construct a graph as below:
+```flow
+st=>start: x
+op=>operation: +
+e=>end
+&```
+
 
 ### Optimizers
 - StochasticGradientDescent
