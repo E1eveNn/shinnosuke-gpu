@@ -4,7 +4,8 @@
 
 2. Completely realized by Python only
 3. Keras-like API
-4. For deep learning studying
+4. Graph are used to construct the system
+5. For deep learning studying
 
 ## Features
 1. Native to Python
@@ -15,6 +16,7 @@
 5. Several basic networks Examples
 6. Sequential model and Functional model are implemented
 7. Autograd is supported 
+8. training is conducted on forward graph and backward graph
 
 ## Installation
 Using pip:
@@ -94,12 +96,8 @@ y=Variable(5)
 z=x+y
 print(z.get_value())
 ```
-#you suppose get 8,at same time shinnosuke construct a graph as below:
-```flow
-st=>start: x
-op=>operation: +
-e=>end
-&```
+#you suppose get a value 8,at same time shinnosuke construct a graph as below(waiting to implement):
+
 
 
 ### Optimizers
