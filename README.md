@@ -1,12 +1,12 @@
-#Shinnosuke-GPU : Deep learning framework
-##Descriptions
+# Shinnosuke-GPU : Deep learning framework
+## Descriptions
 1. Based on Cupy(GPU version)
 
 2. Completely realized by Python only
 3. Keras-like API
 4. For deep learning studying
 
-##Features
+## Features
 1. Native to Python
 
 2. Keras-like API
@@ -16,12 +16,12 @@
 6. Sequential model and Functional model are implemented
 7. Autograd is supported 
 
-##Installation
+## Installation
 Using pip:
 
 `$ pip install shinnosuke-gpu`
 
-##Supports
+## Supports
 
 ### Two model types:
 1.**Sequential**
@@ -78,12 +78,12 @@ model.fit(trainX,trainy,batch_size=512,epochs=1,validation_ratio=0.)
 - ZeroPadding2D
 - Operations( includes Add, Minus, Multiply, Matmul, and so on basic operations for Layer and Node)
 
-####- Node:
+#### - Node:
 
 - Variable
 - Constant
 
-###Optimizers
+### Optimizers
 - StochasticGradientDescent
 
 - Momentum
@@ -95,7 +95,7 @@ model.fit(trainX,trainy,batch_size=512,epochs=1,validation_ratio=0.)
 
 Waiting for implemented more
 
-###Objectives
+### Objectives
 
 - MeanSquaredError
 
@@ -107,7 +107,7 @@ Waiting for implemented more
 
 - CategoricalCrossEntropy (waiting for implemented)
 
-###Activations
+### Activations
 - Relu
 
 - Linear
@@ -116,7 +116,7 @@ Waiting for implemented more
 - Tanh
 - Softmax
 
-###Initializations
+### Initializations
 - Zeros
 
 - Ones
@@ -132,10 +132,10 @@ Waiting for implemented more
 - HeNormal
 - Orthogonal
 
-###Regularizes
+### Regularizes
 waiting for implement.
 
-###Utils
+### Utils
 - get_batches (generate mini-batch)
 
 - to_categorical (convert inputs to one-hot vector/matrix)
