@@ -42,7 +42,7 @@ Shinnosuke provides several classcic AI tasks:
    m.add(Dense(10,activation='softmax'))  
    #no need to specify n_in as shinnosuke will automatic calculate the input and output dim
    m.compile(optimizer='sgd',loss='sparse_categorical_crossentropy') 
-   #specify optimizer and objective,if your want to apply softmax to multi-classify tasks and your labels are one-hot vectors/matrixm,use sparse_categorical_crossentropy(recommend),otherwise use categorical_crossentropy.
+   #specify optimizer and objective,if your want to apply softmax for multi-classify tasks and your labels are one-hot vectors/matrixm,use sparse_categorical_crossentropy(recommend),otherwise use categorical_crossentropy.
    model.fit(trainX,trainy,batch_size=512,epochs=5,validation_ratio=0.) 
    ```
    
