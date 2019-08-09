@@ -37,15 +37,19 @@ Shinnosuke provides several classcic AI tasks:
    from shinnosuke.models import Sequential
    from shinnosuke.layers.FC import Dense
    m=Sequential()
-   m.add(Dense(500,activation='relu',n_in=784))  #must be specify n_in if first layer
-   m.add(Dense(10,activation='softmax'))  #no need to specify n_in as shinnosuke will automatic calculate the input and output dim
-   m.compile(optimizer='sgd',loss='sparse_categorical_crossentropy')  #specify optimizer and objective,if your want to apply softmax to multi-classify tasks and your labels are one-hot vectors/matrixm,use sparse_categorical_crossentropy(recommend),otherwise use categorical_crossentropy.
+   m.add(Dense(500,activation='relu',n_in=784))  
+   #must be specify n_in if first layer
+   m.add(Dense(10,activation='softmax'))  
+   #no need to specify n_in as shinnosuke will automatic calculate the input and output dim
+   m.compile(optimizer='sgd',loss='sparse_categorical_crossentropy') 
+   #specify optimizer and objective,if your want to apply softmax to multi-classify tasks and your labels are one-hot vectors/matrixm,use sparse_categorical_crossentropy(recommend),otherwise use categorical_crossentropy.
    model.fit(trainX,trainy,batch_size=512,epochs=5,validation_ratio=0.) 
    ```
    
    - CNN(Convolutional neural network)
    ```python
-   X_input=Input(shape=(None,1,28,28))  #represents batch_size,channels,height and width respectively,notice that channels must be at the axis 1 instead of -1
+   X_input=Input(shape=(None,1,28,28))  
+   #represents batch_size,channels,height and width respectively,notice that channels must be at the axis 1 instead of -1
    X=Conv2D(8,(3,3),padding='VALID',initializer='normal',activation='relu')(X_input)
    X=MaxPooling2D((2,2))(X)
    X=Flatten()(X)
@@ -132,11 +136,6 @@ print(z.get_value())
 ```
 #you suppose get a value 8,at same time shinnosuke construct a graph as below(waiting to implement):
 
-graph TD
-A[x]
-B[y]
-A-->C(z)
-B-->C(z)
 
 
 ### Optimizers
