@@ -74,7 +74,7 @@ Having finished `compile`, you can start training your data in batches:
 m.fit(trainX, trainy, batch_size=128, epochs=5, validation_ratio=0., draw_acc_loss=True)
 ```
 
-By specify `validation_ratio`=`(0.0,1.0]`, shinnosuke will split validation data from training data according to validation_ratio, otherwise validation_ratio=0. means no validation data. Alternatively you can  feed validation_data manually:
+By specify `validation_ratio` = a float $\in$ `(0.0,1.0]`, shinnosuke will split validation data from training data according to validation_ratio, otherwise validation_ratio=0. means no validation data. Alternatively you can  feed validation_data manually:
 
 ```python
 m.fit(trainX, trainy, batch_size=128, epochs=5, validation_data=(validX,validy), draw_acc_loss=True)
