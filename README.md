@@ -136,7 +136,7 @@ Pass inputs and outputs layer to `Model()`, and then compile and fit model like 
 
 Building an image classification model, a question answering system or any other model is just as convenient and fast~
 
-In the [Examples folder](https://github.com/eLeVeNnN/shinnosuke/Examples) of this repository, you can find more advanced models.(waiting to implement..)
+In the [Examples folder](https://github.com/eLeVeNnN/shinnosuke-gpu/Examples) of this repository, you can find more advanced models.(waiting to implement..)
 
 ------
 
