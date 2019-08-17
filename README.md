@@ -151,7 +151,7 @@ X=Add()([X_shortcut,X])
 Meanwhile Shinnosuke will construct a graph as below:
 
 <div align=center>
-	<img src="C:%5CUsers%5CAdministrator%5CDesktop%5Clayer_graph.jpg" width="300px",height="300px">
+	<img src="https://github.com/eLeVeNnN/shinnosuke/blob/master/docs/imgs/layer_graph.jpg" width="300px",height="300px">
 </div>
 
 
@@ -172,7 +172,7 @@ print(z.get_value())
 You suppose get value 8, at same time shinnosuke construct a graph as below:
 
 <div align=center>
-	<img src="C:%5CUsers%5CAdministrator%5CDesktop%5Clayer_graph.jpg" width="300px",height="300px">
+	<img src="https://github.com/eLeVeNnN/shinnosuke/blob/master/docs/imgs/node_graph.jpg" width="300px",height="300px">
 </div>
 
 
