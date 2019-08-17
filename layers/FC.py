@@ -1,10 +1,9 @@
-from layers.Base import Layer,Matmul,Add,Variable,Constant
-from utils.Initializers import get_initializer
-from utils.Activator import get_activator
-from utils.Regularizers import get_regularizer
 import cupy as cp
 
-
+from .Base import Layer, Variable
+from ..utils.Activator import get_activator
+from ..utils.Initializers import get_initializer
+from ..utils.Regularizers import get_regularizer
 
 
 class Flatten(Layer):
@@ -51,7 +50,7 @@ class Flatten(Layer):
 
 
     def backward(self):
-        for layer in self.inbound_layers:
+        for layer in self.inbounds:
             if layer.require_grads:
                 layer.grads+=cp.reshape(self.grads,self.input_shape)
             else:
@@ -62,20 +61,22 @@ class Flatten(Layer):
 
 
 class Dense(Layer):
-    def __init__(self,n_out,n_in=None,initializer='Normal',activation='linear',kernel_regularizer=None):
+    def __init__(self,n_out,n_in=None,initializer='glorot_uniform',activation='linear',kernel_regularizer=None,**kwargs):
         self.n_out=n_out
         self.n_in=n_in
         self.initializer = get_initializer(initializer)
         self.activator=get_activator(activation)
         self.kernel_regularizer=get_regularizer(kernel_regularizer)
-        super(Dense,self).__init__()
+        super(Dense,self).__init__(**kwargs)
 
 
 
     def connect(self,prev_layer):
         if prev_layer is None:
-            assert self.n_in is not None
-            assert self.input_shape is not None
+            if self.n_in is None and self.input_shape is None:
+                raise ValueError('must specify n_in or input_shape')
+            elif self.input_shape is None:
+                self.input_shape=(None,self.n_in)
         else:
             self.input_shape=prev_layer.output_shape
 
@@ -143,7 +144,7 @@ class Dense(Layer):
         if b.require_grads:
             b.grads+=cp.sum(grads,axis=0,keepdims=True)
         self.timedist_grads=grads.dot(W.output_tensor.T)
-        for layer in self.inbound_layers:
+        for layer in self.inbounds:
             if layer.require_grads:
                 layer.grads+=self.timedist_grads
             else:

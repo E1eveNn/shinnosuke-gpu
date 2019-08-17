@@ -1,7 +1,7 @@
-from layers.Base import Layer
 import cupy as cp
-from utils.Activator import get_activator
 
+from .Base import Layer
+from ..utils.Activator import get_activator
 
 
 class Activation(Layer):
@@ -35,7 +35,7 @@ class Activation(Layer):
 
 
     def backward(self):
-        for layer in self.inbound_layers:
+        for layer in self.inbounds:
             if layer.require_grads:
                 layer.grads+=self.activator._backward(self.grads)
             else:

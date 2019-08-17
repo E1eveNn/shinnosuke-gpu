@@ -1,6 +1,6 @@
-from layers.Base import Layer
 import cupy as cp
 
+from .Base import Layer
 
 
 class Dropout(Layer):
@@ -29,8 +29,9 @@ class Dropout(Layer):
             self.output_tensor=self.input_tensor*random_tensor
             self.output_tensor/=self.keep_prob
 
-            self.mask=random_tensor
+
             if self.require_grads:
+                self.mask = random_tensor
                 self.grads=cp.zeros_like(self.output_tensor)
         else:
             self.output_tensor=self.input_tensor
@@ -38,7 +39,7 @@ class Dropout(Layer):
 
 
     def backward(self):
-        for layer in self.inbound_layers:
+        for layer in self.inbounds:
             if layer.require_grads:
                 layer.grads+=(self.grads*self.mask/self.keep_prob)
             else:

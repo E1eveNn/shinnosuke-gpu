@@ -1,16 +1,13 @@
-from utils.Initializers import get_initializer
-from utils.Activator import get_activator
-from utils.ConvCol import im2col,col2im
-from layers.Base import Layer,Variable
 import cupy as cp
 
-
-
-
+from .Base import Layer, Variable
+from ..utils.Activator import get_activator
+from ..utils.ConvCol import im2col, col2im
+from ..utils.Initializers import get_initializer
 
 
 class Conv2D(Layer):
-    def __init__(self,filter_nums,filter_size,input_shape=None,stride=1,padding='VALID',activation='linear',initializer='Normal'):
+    def __init__(self,filter_nums,filter_size,input_shape=None,stride=1,padding='VALID',activation='linear',initializer='glorot_uniform'):
         self.filter_nums=filter_nums
         self.filter_size=filter_size
         self.input_shape=input_shape
@@ -67,7 +64,7 @@ class Conv2D(Layer):
 
     def __call__(self,prev_layer):
 
-
+        super(Conv2D, self).__call__(prev_layer)
         batch_nums, n_C_prev, n_H_prev, n_W_prev, = self.input_shape
         filter_h, filter_w = self.filter_size
 
@@ -91,14 +88,28 @@ class Conv2D(Layer):
         self.output_shape = (batch_nums, self.filter_nums, n_H, n_W)
         W=Variable(self.initializer((self.filter_nums, n_C_prev, filter_h, filter_w)))
         b=Variable(cp.random.randn(1, self.filter_nums))
-        # W.grads = cp.zeros_like(W.output_tensor) if W.require_grads else None
-        # b.grads = cp.zeros_like(b.output_tensor) if b.require_grads else None
+        W.grads = cp.zeros_like(W.output_tensor) if W.require_grads else None
+        b.grads = cp.zeros_like(b.output_tensor) if b.require_grads else None
         self.variables.append(W)
         self.variables.append(b)
-        super(Conv2D, self).__call__(prev_layer)
+
 
         return self
 
+
+    def _initial_params(self,*args):
+        batch_nums, n_C_prev, n_H_prev, n_W_prev, = self.input_shape
+        filter_h, filter_w = self.filter_size
+
+
+        W = Variable(self.initializer((self.filter_nums, n_C_prev, filter_h, filter_w)))
+        b = Variable(cp.random.randn(1, self.filter_nums))
+
+        self.variables.append(W)
+        self.variables.append(b)
+        for var in self.variables:
+            if var.require_grads:
+                var.grads=cp.zeros_like(var.output_tensor)
 
 
     def forward(self,is_training=True):
@@ -135,14 +146,14 @@ class Conv2D(Layer):
     def backward(self):
         W,b=self.variables
         grads=self.activator._backward(self.grads)
-        filter_nums,n_C,filter_h,filter_w=W.shape
+        filter_nums,n_C,filter_h,filter_w=W.output_shape
         grads=grads.transpose(0,2,3,1).reshape(-1,filter_nums)
         if W.require_grads:
             dW = self.col.T.dot(grads)
             W.grads += dW.transpose(1, 0).reshape(filter_nums, n_C, filter_h, filter_w)
         if b.require_grads:
             b.grads += cp.sum(grads,axis=0)
-        for layer in self.inbound_layers:
+        for layer in self.inbounds:
             if layer.require_grads:
                 dcol = grads.dot(self.col_W.T)
 
@@ -194,7 +205,7 @@ class ZeroPadding2D(Layer):
 
 
     def backward(self):
-        for layer in self.inbound_layers:
+        for layer in self.inbounds:
             if layer.require_grads:
                 layer.grads+=self.grads[:,:,self.pad_h:-self.pad_h,self.pad_w:-self.pad_w]
             else:
@@ -264,7 +275,7 @@ class MaxPooling2D(Layer):
 
         dcol = dmax.reshape(dmax.shape[0] * dmax.shape[1] * dmax.shape[2], -1)
         outputs = col2im(self.inputs_shape,(0,0),self.pool_size, self.stride, dcol)
-        for layer in self.inbound_layers:
+        for layer in self.inbounds:
             if layer.require_grads:
                 layer.grads += outputs
             else:
@@ -338,7 +349,7 @@ class MeanPooling2D(Layer):
         dcol = dmean.reshape(dmean.shape[0] * dmean.shape[1] * dmean.shape[2], -1)
         outputs = col2im(self.inputs_shape,(0,0),self.pool_size, self.stride, dcol)
 
-        for layer in self.inbound_layers:
+        for layer in self.inbounds:
             if layer.require_grads:
                 layer.grads += outputs
             else:

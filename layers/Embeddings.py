@@ -1,7 +1,7 @@
-from layers.Base import Layer,Variable
-from utils.Initializers import get_initializer
 import cupy as cp
 
+from .Base import Layer, Variable
+from ..utils.Initializers import get_initializer
 
 
 class Embedding(Layer):
