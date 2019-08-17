@@ -1,11 +1,7 @@
-from layers.Base import Operation
 import cupy as cp
 import gc
 
-
-
-
-
+from ..layers.Base import Operation
 
 
 class Relu(Operation):

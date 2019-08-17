@@ -1,9 +1,19 @@
 import cupy as cp
-from layers.Base import Variable
+
+from ..layers.Base import Variable
 
 
 def to_categorical(inputs):
-    #convert Y to one-hot encode
+    if inputs.ndim > 2:
+        raise ValueError('only accept 1-d or 2-d inputs')
+    # convert Y to one-hot encode
+    # for example,merge (batch,1) to (batch,)
+    if inputs.ndim == 2:
+        if inputs.shape[-1] == 1:
+            inputs = cp.sum(inputs, axis=-1)
+        else:
+            raise ValueError('can not convert %s to one-hot vector' % (inputs.__class__))
+
     n_class = cp.max(inputs).tolist() + 1
     encoded_Y = cp.eye(n_class)[inputs].reshape(-1, n_class)
     return encoded_Y
@@ -68,5 +78,4 @@ def pad_sequences(sequences,maxlen=None,dtype='int32',padding='pre',truncating='
 
 
 
-pad_sequences([[1,2,3,4,5],[2,5,9]],4,padding='post')
 
