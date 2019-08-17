@@ -6,22 +6,19 @@
 
 
 
-
-
-
-
 ## Descriptions
 
 Shinnosuke is a high-level neural network which API almost identity to Keras with slightly differences. It was written by Python only, and dedicated to realize experimentations quickly.
 
 Here are some features of Shinnosuke:
 
-1. Based on **Cupy** (GPU version)  and **native** to Python.
-2. Without any other 3rd-party deep learning library.
+1. Based on **Cupy**(GPU version)  and **native** to Python.
+2. **Without** any other **3rd-party** deep learning library.
 3. **Keras-like API**, several basic AI Examples are provided, easy to get start.
 4. Support commonly used models such as: Dense, Conv2D, MaxPooling2D, LSTM, SimpleRNN, etc.
 5. **Sequential** model (for most  sequence network combinations ) and **Functional** model (for resnet, etc) are implemented.
-6. Training is conducted on forward graph and backward graph, meanwhile **autograd** is supported .
+6. Training is conducted on forward **graph** and backward **graph**.
+7. **Autograd** is supported .
 
 Shinnosuke is compatible with: **Python 3.x (3.6 is recommended)**
 
@@ -73,7 +70,7 @@ Having finished `compile`, you can start training your data in batches:
 m.fit(trainX, trainy, batch_size=128, epochs=5, validation_ratio=0., draw_acc_loss=True)
 ```
 
-By specify `validation_ratio` = a float belongs to `(0.0,1.0]`, shinnosuke will split validation data from training data according to validation_ratio, otherwise validation_ratio=0. means no validation data. Alternatively you can  feed validation_data manually:
+By specify `validation_ratio`=`(0.0,1.0]`, shinnosuke will split validation data from training data according to validation_ratio, otherwise validation_ratio=0. means no validation data. Alternatively you can  feed validation_data manually:
 
 ```python
 m.fit(trainX, trainy, batch_size=128, epochs=5, validation_data=(validX,validy), draw_acc_loss=True)
@@ -84,8 +81,6 @@ If `draw_acc_loss`=**True**, a dynamic updating figure will be shown in the trai
 <div align=center>
 	<img src="https://github.com/eLeVeNnN/shinnosuke/blob/master/docs/imgs/draw_acc.png" width="">
 </div>
-
-
 
 Evaluate your model performance by `.evaluate()`:
 
@@ -135,27 +130,122 @@ Pass inputs and outputs layer to `Model()`, and then compile and fit model like 
 
 Building an image classification model, a question answering system or any other model is just as convenient and fast~
 
-In the [Examples folder](https://github.com/eLeVeNnN/shinnosuke-gpu/Examples/) of this repository, you can find more advanced models.(waiting to implement..)
+In the [Examples folder](https://github.com/eLeVeNnN/shinnosuke/Examples/) of this repository, you can find more advanced models.(waiting to implement..)
 
 ------
 
+## Both dynamic and static graph features
 
+As you will see soon in below, Shinnosuke has two basic classes - Layer and Node. For Layer, operations between layers can be described like this (here gives an example of '+' ):
+
+```py
+from shinnosuke.layers.Base import Input,Add
+from shinnosuke.layers.FC import Dense
+
+X=Input(shape=(3,5))
+X_shortcut=X
+X=Dense(5)(X)  #Dense will output a (3,5) tensor
+X=Add()([X_shortcut,X])
+```
+
+Meanwhile Shinnosuke will construct a graph as below:
+
+<div align=center>
+	<img src="C:%5CUsers%5CAdministrator%5CDesktop%5Clayer_graph.jpg" width="300px",height="300px">
+</div>
+
+
+
+
+
+ While Node Operations have both dynamic graph and static graph features:
+
+```python
+from shinnosuke.layers.Base import Variable
+
+x=Variable(3)
+y=Variable(5)
+z=x+y  
+print(z.get_value())
+```
+
+You suppose get value 8, at same time shinnosuke construct a graph as below:
+
+<div align=center>
+	<img src="C:%5CUsers%5CAdministrator%5CDesktop%5Clayer_graph.jpg" width="300px",height="300px">
+</div>
+
+
+
+## Autograd
+
+What is autograd? In a word, It means automatically calculate the network's gradients without any prepared backward codes for users, Shinnosuke's autograd supports for several operators, such as +, -, *, /, etc... Here gives an example:
+
+For a simple fully connected neural network, you can use `Dense()` to construct it:
+
+```python
+from shinnosuke.models import Sequential
+from shinnosuke.layers.FC import Dense
+import cupy as cp
+
+#announce a Dense layer
+fullyconnected=Dense(4,n_in=5)
+m=Sequential()
+m.add(fullyconnected)
+m.compile(optimizer='sgd',loss='mse')  #don't mean to train it, use compile to initialize parameters
+#initialize inputs
+cp.random.seed(0)
+X=cp.random.rand(3,5)
+#feed X as fullyconnected's inputs
+fullyconnected.feed(X,'inputs')
+#forward
+fullyconnected.forward()
+out1=fullyconnected
+print(out1.get_value())
+#feed gradient to fullyconnected
+fullyconnected.feed(cp.ones_like(out1),'grads')
+#backward
+fullyconnected.backward()
+W,b=fullyconnected.variables
+print(W.grads)
+```
+
+We can also construct the same layer by using following codes:
+
+```python
+from shinnosuke.layers.Base import Variable
+
+a=Variable(X) # the same as X in previous fullyconnected
+c=Variable(W.get_value())  # the same as W in previous fullyconnected
+d=Variable(b.get_value())  # the same as b in previous fullyconnected
+out2=a @ c+d  # @ represents for matmul
+print(out2.get_value())
+out2.grads=cp.ones_like(out2.get_value())
+# by using grad(),shinnosuke will automatically calculate the gradient from out2 to c
+c.grad()
+print(c.grads)
+```
+
+Guess what? out1 has the same value of out2, and so did W and c's grads. This is the magic autograd of shinnosuke. **By using this feature, users can implement other networks as wishes without writing any backward codes.**
+
+See autograd example in [Here!]()
 
 ## Installation
 
 Before installing Shinnosuke, please install the following **dependencies**:
 
-- Cupy=6.0.0 (recommend)
+- Cupy = 6.0.0 (recommend)
+- matplotlib = 3.0.3 (recommend)
 
-- matplotlib=3.0.3 (recommend)
-
-Then you can install Shinnosuke-gpu by using pip:
+Then you can install Shinnosuke by using pip:
 
 `$ pip install shinnosuke-gpu`
 
 **Installation from Github source will be supported in the future.**
 
 ------
+
+
 
 
 
@@ -173,6 +263,8 @@ Then you can install Shinnosuke-gpu by using pip:
 - Input
 - Dropout
 - BatchNormalization
+- LayerNormalization
+- GroupNormalization
 - TimeDistributed
 - SimpleRNN
 - LSTM
@@ -180,25 +272,12 @@ Then you can install Shinnosuke-gpu by using pip:
 - ZeroPadding2D
 - **Operations( includes Add, Minus, Multiply, Matmul, and so on basic operations for Layer and Node)**
 
-Operations for layers are conducted to construt a graph.(waiting to implement)
-
 
 
 #### - Node:
 
 - Variable
 - Constant
-
-While Node Operations have both dynamic graph and static graph features
-
-```python
-x=Variable(3)
-y=Variable(5)
-z=x+y
-print(z.get_value())
-```
-
-You suppose get a value 8,at same time shinnosuke construct a graph as below(waiting to implement):
 
 
 
