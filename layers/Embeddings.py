@@ -1,6 +1,6 @@
 import cupy as cp
 
-from .Base import Layer, Variable
+from .Core import Layer, Variable
 from ..utils.Initializers import get_initializer
 
 
@@ -63,12 +63,15 @@ class Embedding(Layer):
 
     def backward(self):
         W,=self.variables
-        flatten_idxs=self.input_tensor.flatten()
-        unique_idxs=cp.unique(flatten_idxs)
-        flatten_grads=self.grads.reshape(-1,self.output_shape[-1])
+        # flatten_idxs=self.input_tensor.flatten()
+        # unique_idxs=cp.unique(flatten_idxs)
+        # flatten_grads=self.grads.reshape(-1,self.output_shape[-1])
+        # if W.require_grads:
+        #     for idx in unique_idxs:
+        #         W.grads[idx]+=cp.sum(flatten_grads[flatten_idxs==idx],axis=0)
         if W.require_grads:
-            for idx in unique_idxs:
-                W.grads[idx]+=cp.sum(flatten_grads[flatten_idxs==idx],axis=0)
+            cp.add.at(W.grads,self.input_tensor,self.grads)
+
 
 
 

@@ -1,47 +1,48 @@
 import cupy as cp
 
-from .Base import Layer, Variable
+from .Core import Layer, Variable
 from ..utils.Activator import get_activator
 from ..utils.Initializers import get_initializer
 from ..utils.Regularizers import get_regularizer
 
 
+
 class Flatten(Layer):
-    def __init__(self,out_dim=2):
-        if out_dim<1:
+    def __init__(self, out_dim: int = 2, **kwargs):
+        if out_dim < 1:
             raise ValueError('out_dim must be > 0')
-        self.out_dim=out_dim
-        super(Flatten,self).__init__()
+        self.out_dim = out_dim
+        super(Flatten, self).__init__(**kwargs)
 
 
 
-    def connect(self,prev_layer):
-        assert len(prev_layer.output_shape)>=3
-        flatten_shape=cp.prod(cp.array(prev_layer.output_shape[self.out_dim-1:])).tolist()
-        flatten_shape=prev_layer.output_shape[:self.out_dim-1]+(flatten_shape,)
-        self.output_shape=flatten_shape
+    def connect(self, prev_layer: Layer):
+        assert len(prev_layer.output_shape) >= 3
+        flatten_shape = cp.prod(cp.array(prev_layer.output_shape[self.out_dim - 1:])).tolist()
+        flatten_shape = prev_layer.output_shape[:self.out_dim - 1] + (flatten_shape, )
+        self.output_shape = flatten_shape
         Layer.connect(self, prev_layer)
 
 
 
 
-    def __call__(self,layers):
-        super(Flatten,self).__call__(layers)
+    def __call__(self, layers: Layer) -> Layer:
+        super(Flatten, self).__call__(layers)
         flatten_shape = cp.prod(cp.array(self.input_shape[self.out_dim - 1:])).tolist()
-        flatten_shape = self.input_shape[:self.out_dim - 1] + (flatten_shape,)
+        flatten_shape = self.input_shape[:self.out_dim - 1] + (flatten_shape, )
         self.output_shape = flatten_shape
 
         return self
 
 
 
-    def forward(self,is_training=True):
-        inputs=self.input_tensor
-        flatten_shape=inputs.shape[:self.out_dim-1]+(-1,)
-        self.output_tensor=cp.reshape(inputs,flatten_shape)
+    def forward(self, is_training: bool = True):
+        inputs = self.input_tensor
+        flatten_shape = inputs.shape[:self.out_dim - 1] + (-1, )
+        self.output_tensor = cp.reshape(inputs, flatten_shape)
         if is_training:
             if self.require_grads:
-                self.input_shape=inputs.shape
+                self.input_shape = inputs.shape
                 self.grads = cp.zeros_like(self.output_tensor)
         del inputs
         super().forward(is_training)
@@ -52,33 +53,33 @@ class Flatten(Layer):
     def backward(self):
         for layer in self.inbounds:
             if layer.require_grads:
-                layer.grads+=cp.reshape(self.grads,self.input_shape)
+                layer.grads += cp.reshape(self.grads,self.input_shape)
             else:
-                layer.grads=self.grads
+                layer.grads = self.grads
 
 
 
 
 
 class Dense(Layer):
-    def __init__(self,n_out,n_in=None,initializer='glorot_uniform',activation='linear',kernel_regularizer=None,**kwargs):
-        self.n_out=n_out
-        self.n_in=n_in
+    def __init__(self, n_out: int, n_in: int = None, initializer='glorot_uniform', activation='linear', kernel_regularizer=None, **kwargs):
+        self.n_out = n_out
+        self.n_in = n_in
         self.initializer = get_initializer(initializer)
-        self.activator=get_activator(activation)
-        self.kernel_regularizer=get_regularizer(kernel_regularizer)
+        self.activator = get_activator(activation)
+        self.kernel_regularizer = get_regularizer(kernel_regularizer)
         super(Dense,self).__init__(**kwargs)
 
 
 
-    def connect(self,prev_layer):
+    def connect(self,prev_layer: Layer):
         if prev_layer is None:
             if self.n_in is None and self.input_shape is None:
                 raise ValueError('must specify n_in or input_shape')
             elif self.input_shape is None:
-                self.input_shape=(None,self.n_in)
+                self.input_shape = (None, self.n_in)
         else:
-            self.input_shape=prev_layer.output_shape
+            self.input_shape = prev_layer.output_shape
 
         self._initial_params()
         Layer.connect(self, prev_layer)
@@ -93,10 +94,10 @@ class Dense(Layer):
 
 
 
-    def __call__(self,prev_layer):
+    def __call__(self,prev_layer: Layer) -> Layer:
         super(Dense, self).__call__(prev_layer)
         self._initial_params()
-        self.output_shape=self.compute_output_shape()
+        self.output_shape = self.compute_output_shape()
         return self
 
 
@@ -114,16 +115,16 @@ class Dense(Layer):
 
 
     def compute_output_shape(self):
-        return self.input_shape[:-1]+(self.n_out,)
+        return self.input_shape[:-1] + (self.n_out, )
 
 
 
 
 
-    def forward(self,is_training=True):
-        W,b=self.variables
-        output=self.input_tensor.dot(W.output_tensor)+b.output_tensor
-        self.output_tensor=self.activator._forward(output,is_training=is_training)
+    def forward(self, is_training: bool = True):
+        W, b = self.variables
+        output = self.input_tensor.dot(W.output_tensor) + b.output_tensor
+        self.output_tensor = self.activator._forward(output, is_training = is_training)
         if is_training:
             if not W.require_grads:
                 del self.input_tensor
@@ -138,18 +139,18 @@ class Dense(Layer):
 
     def backward(self):
         W, b = self.variables
-        grads=self.activator._backward(self.grads)
+        grads = self.activator._backward(self.grads)
         if W.require_grads:
-            W.grads+=self.input_tensor.T.dot(grads)
+            W.grads += self.input_tensor.T.dot(grads)
         if b.require_grads:
-            b.grads+=cp.sum(grads,axis=0,keepdims=True)
-        self.timedist_grads=grads.dot(W.output_tensor.T)
+            b.grads += cp.sum(grads, axis=0, keepdims=True)
+        self.timedist_grads = grads.dot(W.output_tensor.T)
         for layer in self.inbounds:
             if layer.require_grads:
-                layer.grads+=self.timedist_grads
+                layer.grads += self.timedist_grads
             else:
-                self.grads=grads
-                layer.grads=grads
+                self.grads = grads
+                layer.grads = grads
 
         # self.counts-=1
         #

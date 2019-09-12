@@ -1,6 +1,6 @@
 import cupy as cp
 
-from .Base import Layer
+from .Core import Layer
 
 
 class TimeDistributed(Layer):

@@ -1,10 +1,10 @@
 import cupy as cp
 import gc
 
-from ..layers.Base import Operation
+from ..layers.Core import Operation
 
 
-class Relu(Operation):
+class ReLU(Operation):
     def _forward(self,inputs,is_training=True):
         if is_training:
             self.inputs=inputs
@@ -140,7 +140,7 @@ def get_activator(activator):
     if activator.__class__.__name__=='str':
         activator=activator.lower()
         if activator=='relu':
-            return Relu()
+            return ReLU()
         elif activator=='softmax':
             return Softmax()
         elif activator=='linear':

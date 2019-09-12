@@ -1,6 +1,6 @@
 import cupy as cp
 
-from .Base import Layer, Variable
+from .Core import Layer, Variable
 from ..utils.Activator import get_activator
 from ..utils.Initializers import get_initializer
 from ..utils.Preprocess import concatenate
@@ -113,7 +113,7 @@ class SimpleRNNCell(Layer):
                     Wxa.grads += cp.dot(self.input_tensor[:, t, :].T, dz)
                 if ba.require_grads:
                     ba.grads += dz
-                da_next = cp.dot(dz, Waa.output_tensor)
+                da_next = cp.dot(dz, Waa.output_tensor.T)
 
                 grad[:, t, :] = cp.dot(dz, Wxa.output_tensor.T)
         else:
@@ -128,7 +128,7 @@ class SimpleRNNCell(Layer):
                     ba.grads+=da
 
                 grad[:,t,:]=cp.dot(da,Wxa.output_tensor.T)
-                da=cp.dot(da,Waa)
+                da=cp.dot(da,Waa.output_tensor.T)
 
         return grad
 
@@ -226,7 +226,7 @@ class LSTMCell(Layer):
 
     def _initial_params(self, n_in, n_out):
         #Wf_l means forget gate linear weight,Wf_r represents forget gate recurrent weight.
-        variables = []
+
         #forget gate
         Wf_l = Variable(self.initializer((n_in,n_out)), name='Wf_l')
         Wf_r = Variable(self.recurrent_initializer((n_out, n_out)), name='Wf_r')
@@ -240,20 +240,22 @@ class LSTMCell(Layer):
         Wo_l = Variable(self.initializer((n_in,n_out)), name='Wo_l')
         Wo_r = Variable(self.recurrent_initializer((n_out, n_out)), name='Wo_r')
 
-        Wf=concatenate(Wf_r,Wf_l,axis=0,name='Wf')
-        Wu=concatenate(Wu_r,Wu_l,axis=0,name='Wu')
-        Wc=concatenate(Wc_r,Wc_l,axis=0,name='Wc')
-        Wo=concatenate(Wo_r,Wo_l,axis=0,name='Wo')
-
-        del Wf_r,Wf_l,Wu_r,Wu_l,Wc_r,Wc_l,Wo_r,Wo_l
+        Wf = concatenate(Wf_r, Wf_l, axis=0, name='Wf')
+        Wu = concatenate(Wu_r, Wu_l, axis=0, name='Wu')
+        Wc = concatenate(Wc_r, Wc_l, axis=0, name='Wc')
+        Wo = concatenate(Wo_r, Wo_l, axis=0, name='Wo')
+        W = concatenate(Wf, Wu, Wc, Wo, axis=1)
         if self.unit_forget_bias:
             bf = Variable(cp.ones((1, n_out)), name='bf')
         else:
             bf = Variable(cp.zeros((1, n_out)), name='bf')
-        bu=Variable(cp.zeros((1, n_out)), name='bu')
-        bc=Variable(cp.zeros((1, n_out)), name='bc')
-        bo=Variable(cp.zeros((1, n_out)), name='bo')
-        variables.extend([Wf,Wu,Wc,Wo,bf,bu,bc,bo])
+        bu = Variable(cp.zeros((1, n_out)), name='bu')
+        bc = Variable(cp.zeros((1, n_out)), name='bc')
+        bo = Variable(cp.zeros((1, n_out)), name='bo')
+        b = concatenate(bf, bu, bc, bo, axis=1, name='b')
+        del Wf_r, Wf_l, Wu_r, Wu_l, Wc_r, Wc_l, Wo_r, Wo_l, Wf, Wu, Wc, Wo, bf, bu, bc, bo
+        variables = [W, b]
+
         for var in variables:
             if var.require_grads:
                 var.grads=cp.zeros_like(var.output_tensor)
@@ -263,7 +265,7 @@ class LSTMCell(Layer):
 
     def _forward(self, inputs, variables, is_training, stateful):
         batch_nums, timesteps, n_vec = inputs.shape
-        Wf,Wu,Wc,Wo,bf,bu,bc,bo = variables
+        W,b = variables
         if is_training:
             self.timesteps = timesteps
             if self.__first_initialize:
@@ -282,23 +284,25 @@ class LSTMCell(Layer):
         self.recurrent_activations = [self.recurrent_activator_cls() for _ in range(3*timesteps)]
 
         z=cp.zeros((batch_nums,timesteps,n_vec+self.units))
-        w = cp.concatenate((Wf.output_tensor, Wu.output_tensor, Wc.output_tensor, Wo.output_tensor), axis=1)
-        b = cp.concatenate((bf.output_tensor, bu.output_tensor, bc.output_tensor, bo.output_tensor), axis=1)
+        # w = cp.concatenate((Wf.output_tensor, Wu.output_tensor, Wc.output_tensor, Wo.output_tensor), axis=1)
+        # b = cp.concatenate((bf.output_tensor, bu.output_tensor, bc.output_tensor, bo.output_tensor), axis=1)
         for t in range(1, timesteps + 1):
-            zt=cp.concatenate((self.prev_a[:,t-1,:],inputs[:,t-1,:]),axis=1)
-            ot=zt.dot(w)+b
-            f=ot[:,:self.units]
-            u=ot[:,self.units:self.units*2]
-            c_tilde=ot[:,self.units*2:self.units*3]
-            o=ot[:,self.units*3:]
-            self.tao_f[:, t-1, :] = self.recurrent_activations[3*(t-1)]._forward(f)
-            self.tao_u[:, t-1, :] = self.recurrent_activations[3*(t - 1)+1]._forward(u)
-            self.c_tilde[:, t-1, :] = self.activations[t - 1]._forward(c_tilde)
-            self.c[:,t,:]=self.tao_f[:,t-1,:]*self.c[:,t-1,:]+self.tao_u[:, t-1, :]*self.c_tilde[:, t-1, :]
-            self.tao_o[:,t-1,:]=self.recurrent_activations[3*(t-1)+2]._forward(o)
-            self.prev_a[:,t,:]=self.tao_o[:,t-1,:]*cp.tanh(self.c[:,t,:])
-            z[:,t-1,:]=zt
+            zt = cp.concatenate((self.prev_a[:, t - 1, :], inputs[:, t - 1, :]), axis=1)
+            ot = zt.dot(W.output_tensor) + b.output_tensor
+            f = self.recurrent_activations[3 * (t - 1)]._forward(ot[:, :self.units])
+            u = self.recurrent_activations[3 * (t - 1) + 1]._forward(ot[:, self.units:self.units * 2])
+            c_tilde = self.activations[t - 1]._forward(ot[:, self.units * 2:self.units * 3])
+            o = self.recurrent_activations[3 * (t - 1) + 2]._forward(ot[:, self.units * 3:])
+            self.c_tilde[:, t - 1, :] = c_tilde
+            c = f * self.c[:, t - 1, :] + u * c_tilde
+            self.prev_a[:, t, :] = o * cp.tanh(c)
 
+            self.tao_f[:, t - 1, :] = f
+            self.tao_u[:, t - 1, :] = u
+            self.tao_o[:, t - 1, :] = o
+            self.c[:, t, :] = c
+
+            z[:, t - 1, :] = zt
 
         if is_training:
             self.input_tensor = z
@@ -309,91 +313,103 @@ class LSTMCell(Layer):
 
 
     def _backward(self, pre_grad, variables, return_sequences):
-        Wf,Wu,Wc,Wo,bf,bu,bc,bo = variables
+        W, b = variables
         grad = cp.zeros_like(self.input_tensor)
-        grad=grad[:,:,self.units:]
+        grad = grad[:, :, self.units:]
         if return_sequences:
             da_next = cp.zeros_like(self.prev_a[:, 0, :])
-            dc_next=cp.zeros_like(self.c[:,0,:])
+            dc_next = cp.zeros_like(self.c[:, 0, :])
             for t in reversed(range(self.timesteps)):
                 da = pre_grad[:, t, :] + da_next
-                dtao_o=da*cp.tanh(self.c[:,t+1,:])
-                do=self.recurrent_activations[3*(t+1)-1]._backward(dtao_o)
-                if Wo.require_grads:
-                    Wo.grads += cp.dot(self.input_tensor[:,t,:].T,do)
-                if bo.require_grads:
-                    bo.grads+=cp.sum(do,axis=0,keepdims=True)
-                #tanh backward
-                dc=dc_next
-                dc+=da*self.tao_o[:,t,:]*(1-cp.square(cp.tanh(self.c[:,t+1,:])))
+                dtao_o = da * cp.tanh(self.c[:, t + 1, :])
+                do = self.recurrent_activations[3 * (t + 1) - 1]._backward(dtao_o)
+                # if Wo.require_grads:
+                #     Wo.grads += cp.dot(self.input_tensor[:,t,:].T,do)
+                # if bo.require_grads:
+                #     bo.grads+=cp.sum(do,axis=0,keepdims=True)
+                # tanh backward
+                dc = dc_next
+                dc += da * self.tao_o[:, t, :] * (1 - cp.square(cp.tanh(self.c[:, t + 1, :])))
                 # dc=Tanh._backward(da*self.tao_o[:,t,:],self.c[:,t,:])+dc_next
-                dc_tilde=dc*self.tao_u[:,t,:]
-                dc_tilde_before_act=self.activations[t]._backward(dc_tilde)
+                dc_tilde = dc * self.tao_u[:, t, :]
+                dc_tilde_before_act = self.activations[t]._backward(dc_tilde)
 
-                if Wc.require_grads:
-                    Wc.grads += cp.dot(self.input_tensor[:, t, :].T, dc_tilde_before_act)
-                if bc.require_grads:
-                    bc.grads += cp.sum(dc_tilde_before_act,axis=0,keepdims=True)
-                dtao_u=dc*self.c_tilde[:,t,:]
-                du=self.recurrent_activations[3*(t+1)-2]._backward(dtao_u)
-                if Wu.require_grads:
-                    Wu.grads += cp.dot(self.input_tensor[:, t, :].T, du)
-                if bu.require_grads:
-                    bu.grads += cp.sum(du,axis=0,keepdims=True)
-                dtao_f=dc*self.c[:,t,:]
-                df=self.recurrent_activations[3*(t+1)-3]._backward(dtao_f)
-                if Wf.require_grads:
-                    Wf.grads += cp.dot(self.input_tensor[:, t, :].T, df)
-                if bf.require_grads:
-                    bf.grads += cp.sum(df,axis=0,keepdims=True)
-                dz=df.dot(Wf.output_tensor.T)+du.dot(Wu.output_tensor.T)+do.dot(Wo.output_tensor.T)+dc_tilde_before_act.dot(Wc.output_tensor.T)
+                # if Wc.require_grads:
+                #     Wc.grads += cp.dot(self.input_tensor[:, t, :].T, dc_tilde_before_act)
+                # if bc.require_grads:
+                #     bc.grads += cp.sum(dc_tilde_before_act,axis=0,keepdims=True)
+                dtao_u = dc * self.c_tilde[:, t, :]
+                du = self.recurrent_activations[3 * (t + 1) - 2]._backward(dtao_u)
+                # if Wu.require_grads:
+                #     Wu.grads += cp.dot(self.input_tensor[:, t, :].T, du)
+                # if bu.require_grads:
+                #     bu.grads += cp.sum(du,axis=0,keepdims=True)
+                dtao_f = dc * self.c[:, t, :]
+                df = self.recurrent_activations[3 * (t + 1) - 3]._backward(dtao_f)
+                # if Wf.require_grads:
+                #     Wf.grads += cp.dot(self.input_tensor[:, t, :].T, df)
+                # if bf.require_grads:
+                #     bf.grads += cp.sum(df,axis=0,keepdims=True)
+                dgrad = cp.concatenate((do, dc_tilde_before_act, du, df), axis=1)
+                if W.require_grads:
+                    W.grads += cp.dot(self.input_tensor[:, t, :].T, dgrad)
+                if b.require_grads:
+                    b.grads += cp.sum(dgrad, axis=0, keepdims=True)
+                # dz=df.dot(Wf.output_tensor.T)+du.dot(Wu.output_tensor.T)+do.dot(Wo.output_tensor.T)+dc_tilde_before_act.dot(Wc.output_tensor.T)
+                dz = dgrad.dot(W.output_tensor.T)
 
-                da_next = dz[:,:self.units]
-                dc_next = dc*self.tao_f[:,t,:]
+                da_next = dz[:, :self.units]
+                dc_next = dc * self.tao_f[:, t, :]
 
-                grad[:, t, :] = dz[:,self.units:]
+                grad[:, t, :] = dz[:, self.units:]
         else:
             da_next = cp.zeros_like(self.prev_a[:, 0, :])
             dc_next = cp.zeros_like(self.c[:, 0, :])
             da = pre_grad + da_next
             for t in reversed(range(self.timesteps)):
 
-                dtao_o = da * cp.tanh(self.c[:, t+1, :])
-                do = self.recurrent_activations[3*(t+1)-1]._backward(dtao_o)
-                if Wo.require_grads:
-                    Wo.grads += cp.dot(self.input_tensor[:,t,:].T,do)
-                if bo.require_grads:
-                    bo.grads+=cp.sum(do,axis=0,keepdims=True)
+                dtao_o = da * cp.tanh(self.c[:, t + 1, :])
+                do = self.recurrent_activations[3 * (t + 1) - 1]._backward(dtao_o)
+                # if Wo.require_grads:
+                #     Wo.grads += cp.dot(self.input_tensor[:,t,:].T,do)
+                # if bo.require_grads:
+                #     bo.grads+=cp.sum(do,axis=0,keepdims=True)
                 dc = dc_next
-                dc += da * self.tao_o[:, t, :] * (1 - cp.square(cp.tanh(self.c[:, t+1, :])))
+                dc += da * self.tao_o[:, t, :] * (1 - cp.square(cp.tanh(self.c[:, t + 1, :])))
                 # dc = Tanh._backward(da * self.tao_o[:, t, :], cp.tanh(self.c[:, t, :])) + dc_next
                 dc_tilde = dc * self.tao_u[:, t, :]
-                dc_tilde_before_act=self.activations[t]._backward(dc_tilde)
+                dc_tilde_before_act = self.activations[t]._backward(dc_tilde)
 
-                if Wc.require_grads:
-                    Wc.grads += cp.dot(self.input_tensor[:, t, :].T, dc_tilde_before_act)
-                if bc.require_grads:
-                    bc.grads += cp.sum(dc_tilde_before_act,axis=0,keepdims=True)
+                # if Wc.require_grads:
+                #     Wc.grads += cp.dot(self.input_tensor[:, t, :].T, dc_tilde_before_act)
+                # if bc.require_grads:
+                #     bc.grads += cp.sum(dc_tilde_before_act,axis=0,keepdims=True)
                 dtao_u = dc * self.c_tilde[:, t, :]
-                du = self.recurrent_activations[3*(t+1)-2]._backward(dtao_u)
-                if Wu.require_grads:
-                    Wu.grads += cp.dot(self.input_tensor[:, t, :].T, du)
-                if bu.require_grads:
-                    bu.grads += cp.sum(du,axis=0,keepdims=True)
+                du = self.recurrent_activations[3 * (t + 1) - 2]._backward(dtao_u)
+                # if Wu.require_grads:
+                #     Wu.grads += cp.dot(self.input_tensor[:, t, :].T, du)
+                # if bu.require_grads:
+                #     bu.grads += cp.sum(du,axis=0,keepdims=True)
                 dtao_f = dc * self.c[:, t, :]
-                df = self.recurrent_activations[3*(t+1)-3]._backward(dtao_f)
-                if Wf.require_grads:
-                    Wf.grads += cp.dot(self.input_tensor[:, t, :].T, df)
-                if bf.require_grads:
-                    bf.grads += cp.sum(df,axis=0,keepdims=True)
+                df = self.recurrent_activations[3 * (t + 1) - 3]._backward(dtao_f)
+                # if Wf.require_grads:
+                #     Wf.grads += cp.dot(self.input_tensor[:, t, :].T, df)
+                # if bf.require_grads:
+                #     bf.grads += cp.sum(df,axis=0,keepdims=True)
 
-                dz = df.dot(Wf.output_tensor.T) + du.dot(Wu.output_tensor.T) + do.dot(Wo.output_tensor.T) + dc_tilde_before_act.dot(Wc.output_tensor.T)
+                # dz = df.dot(Wf.output_tensor.T) + du.dot(Wu.output_tensor.T) + do.dot(Wo.output_tensor.T) + dc_tilde_before_act.dot(Wc.output_tensor.T)
+                dgrad = cp.concatenate((do, dc_tilde_before_act, du, df), axis=1)
+                if W.require_grads:
+                    W.grads += cp.dot(self.input_tensor[:, t, :].T, dgrad)
+                if b.require_grads:
+                    b.grads += cp.sum(dgrad, axis=0, keepdims=True)
+
+                dz = dgrad.dot(W.output_tensor.T)
 
                 da = dz[:, :self.units]
                 dc_next = dc * self.tao_f[:, t, :]
 
                 grad[:, t, :] = dz[:, self.units:]
-
 
         return grad
 

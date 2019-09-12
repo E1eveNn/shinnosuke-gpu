@@ -1,6 +1,6 @@
 import cupy as cp
 from functools import reduce
-from .Base import Layer, Variable
+from .Core import Layer, Variable
 from ..utils.Initializers import get_initializer
 
 

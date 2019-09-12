@@ -1,6 +1,6 @@
 import cupy as cp
 
-from ..layers.Base import Variable
+from ..layers.Core import Variable
 
 
 def to_categorical(inputs):
